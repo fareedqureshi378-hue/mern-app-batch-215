@@ -1,23 +1,23 @@
-name: Build Push Deploy
+name: Build and Push Docker Images
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
-  deploy:
+  dockerhub:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set tag
+      - name: Set image tag
         run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
-      - name: Login Docker Hub
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -26,32 +26,19 @@ jobs:
       - name: Build frontend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mern-frontend:${IMAGE_TAG} ./client
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/mern-frontend:${IMAGE_TAG} ${{ secrets.DOCKERHUB_USERNAME }}/mern-frontend:latest
 
       - name: Build backend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mern-backend:${IMAGE_TAG} ./server
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/mern-backend:${IMAGE_TAG} ${{ secrets.DOCKERHUB_USERNAME }}/mern-backend:latest
 
       - name: Push frontend image
         run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/mern-frontend:${IMAGE_TAG}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mern-frontend:latest
 
       - name: Push backend image
         run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/mern-backend:${IMAGE_TAG}
-
-      - name: Deploy on AWS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.AWS_HOST }}
-          username: ubuntu
-          key: ${{ secrets.AWS_SSH_KEY }}
-          script: |
-            cd /opt/myapp/mern-app-batch-215
-
-            echo "IMAGE_TAG=${{ env.IMAGE_TAG }}" > .env
-
-            docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d
-
-            docker ps
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mern-backend:latest
