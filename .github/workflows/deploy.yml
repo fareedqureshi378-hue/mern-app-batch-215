@@ -1,4 +1,4 @@
-name: Save File Artifact
+name: Deploy with Docker Compose
 
 on:
   push:
@@ -6,21 +6,20 @@ on:
       - main
 
 jobs:
-  create-artifact:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Create a file
-        run: |
-          mkdir output
-          echo "Hello from GitHub Actions" > output/message.txt
-          echo "This file is stored as an artifact." >> output/message.txt
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Deploy on AWS server
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          name: my-artifact
-          path: output/message.txt
+          host: ${{ secrets.AWS_HOST }}
+          username: ubuntu
+          key: ${{ secrets.AWS_SSH_KEY }}
+          script: |
+            cd /opt/myapp/mern-app-batch-215
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
+            docker ps
+            docker compose logs --tail=100
