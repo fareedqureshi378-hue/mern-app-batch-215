@@ -17,7 +17,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.AWS_SSH_KEY }}
           script: |
-            cd /opt/myapp
+            cd /opt/myapp/mern-app-batch-215
             git pull origin main
             docker compose down
             docker compose up -d --build
