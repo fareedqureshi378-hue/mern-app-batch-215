@@ -1,0 +1,57 @@
+name: Build Push Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set tag
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build frontend image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mern-frontend:${IMAGE_TAG} ./client
+
+      - name: Build backend image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/mern-backend:${IMAGE_TAG} ./server
+
+      - name: Push frontend image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mern-frontend:${IMAGE_TAG}
+
+      - name: Push backend image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/mern-backend:${IMAGE_TAG}
+
+      - name: Deploy on AWS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ubuntu
+          key: ${{ secrets.AWS_SSH_KEY }}
+          script: |
+            cd /opt/myapp/mern-app-batch-215
+
+            echo "IMAGE_TAG=${{ env.IMAGE_TAG }}" > .env
+
+            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+
+            docker ps
